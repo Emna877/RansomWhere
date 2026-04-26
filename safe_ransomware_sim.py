@@ -186,61 +186,80 @@ def launch_lock_interface(affected_files: int, elapsed_seconds: float) -> None:
     """
     root = tk.Tk()
     root.title("Security Access Console")
-    root.geometry("760x420")
-    root.configure(bg="#101010")
+    root.geometry("880x520")
+    root.minsize(780, 470)
+    root.configure(bg="#050605")
 
-    container = tk.Frame(root, bg="#161616", padx=22, pady=20, highlightbackground="#2d2d2d", highlightthickness=1)
-    container.pack(fill="both", expand=True, padx=24, pady=24)
-
-    title = tk.Label(
-        container,
-        text="SECURITY ACCESS CONTROL",
-        font=("Consolas", 20, "bold"),
-        fg="#ff6b3d",
-        bg="#161616",
+    container = tk.Frame(
+        root,
+        bg="#0b0d0b",
+        padx=18,
+        pady=18,
+        highlightbackground="#1d3a1d",
+        highlightthickness=1,
     )
-    title.pack(anchor="w")
+    container.pack(fill="both", expand=True, padx=18, pady=18)
 
-    subtitle = tk.Label(
+    header = tk.Label(
         container,
-        text="Data access restricted",
-        font=("Consolas", 12),
-        fg="#d0d0d0",
-        bg="#161616",
-        pady=10,
+        text="[ SYSTEM ACCESS TERMINAL ]",
+        font=("Consolas", 15, "bold"),
+        fg="#ff6a3a",
+        bg="#0b0d0b",
+        anchor="w",
     )
-    subtitle.pack(anchor="w")
+    header.pack(fill="x", pady=(0, 10))
 
-    info_text = (
-        f"Affected files : {affected_files}\n"
-        f"Processing time: {elapsed_seconds:.2f} s\n"
-        f"Current status : Files inaccessible\n"
-        f"Sandbox scope  : {SANDBOX_DIR}"
-    )
-    info = tk.Label(
+    terminal_panel = tk.Frame(
         container,
-        text=info_text,
+        bg="#080a08",
+        highlightbackground="#1b511b",
+        highlightthickness=1,
+        padx=14,
+        pady=12,
+    )
+    terminal_panel.pack(fill="both", expand=True)
+
+    status_var = tk.StringVar(value="> STATUS: Recovery required")
+
+    # Build a terminal-like status readout for a stronger cyber-lab presentation style.
+    terminal_lines = (
+        "> boot sequence.................ok\n"
+        "> endpoint profile..............restricted\n"
+        "> channel state..................isolated\n"
+        ">\n"
+        f"> affected files.................{affected_files}\n"
+        f"> processing time................{elapsed_seconds:.2f} s\n"
+        "> current status.................Files inaccessible\n"
+        f"> sandbox scope..................{SANDBOX_DIR}\n"
+        ">\n"
+        "> operator action required."
+    )
+
+    terminal_label = tk.Label(
+        terminal_panel,
+        text=terminal_lines,
         justify="left",
+        anchor="nw",
         font=("Consolas", 12),
-        fg="#f0f0f0",
-        bg="#161616",
-        pady=8,
+        fg="#7dff7d",
+        bg="#080a08",
     )
-    info.pack(anchor="w")
+    terminal_label.pack(fill="both", expand=True)
 
-    status_var = tk.StringVar(value="Recovery required")
     status_label = tk.Label(
-        container,
+        terminal_panel,
         textvariable=status_var,
         font=("Consolas", 11, "bold"),
         fg="#ffb347",
-        bg="#161616",
-        pady=10,
+        bg="#080a08",
+        anchor="w",
+        pady=8,
     )
-    status_label.pack(anchor="w")
+    status_label.pack(fill="x")
 
-    buttons = tk.Frame(container, bg="#161616")
-    buttons.pack(anchor="w", pady=16)
+    buttons = tk.Frame(container, bg="#0b0d0b")
+    buttons.pack(anchor="w", pady=(14, 0))
 
     def on_restore_access() -> None:
         start = time.perf_counter()
@@ -248,52 +267,64 @@ def launch_lock_interface(affected_files: int, elapsed_seconds: float) -> None:
         decrypt_elapsed = time.perf_counter() - start
         log_summary("decrypt", decrypt_stats)
         status_var.set(
-            f"Access restored | decrypted={decrypt_stats['decrypted']} | time={decrypt_elapsed:.2f}s"
+            f"> STATUS: Access restored | decrypted={decrypt_stats['decrypted']} | time={decrypt_elapsed:.2f}s"
         )
         messagebox.showinfo("Recovery Complete", "Sandbox files have been restored.")
 
     restore_button = tk.Button(
         buttons,
-        text="Restore Access",
+        text="[ Restore Access ]",
         command=on_restore_access,
-        bg="#222222",
-        fg="#f5f5f5",
-        activebackground="#2f2f2f",
-        activeforeground="#ffffff",
+        bg="#0f1610",
+        fg="#89ff89",
+        activebackground="#1a2a1a",
+        activeforeground="#b6ffb6",
         relief="flat",
+        highlightbackground="#295229",
+        highlightthickness=1,
+        bd=0,
         padx=14,
-        pady=8,
+        pady=9,
         font=("Consolas", 11, "bold"),
+        cursor="hand2",
     )
     restore_button.grid(row=0, column=0, padx=(0, 12))
 
     log_button = tk.Button(
         buttons,
-        text="View Activity Log",
+        text="[ View Activity Log ]",
         command=open_activity_log,
-        bg="#222222",
-        fg="#f5f5f5",
-        activebackground="#2f2f2f",
-        activeforeground="#ffffff",
+        bg="#111313",
+        fg="#d0d6d0",
+        activebackground="#1f2322",
+        activeforeground="#ecf2ec",
         relief="flat",
+        highlightbackground="#3a3f3d",
+        highlightthickness=1,
+        bd=0,
         padx=14,
-        pady=8,
+        pady=9,
         font=("Consolas", 11),
+        cursor="hand2",
     )
     log_button.grid(row=0, column=1, padx=(0, 12))
 
     exit_button = tk.Button(
         buttons,
-        text="Exit",
+        text="[ Exit ]",
         command=root.destroy,
-        bg="#3a1f1b",
-        fg="#ffd7cf",
-        activebackground="#4a2a25",
+        bg="#2a1110",
+        fg="#ff9f8a",
+        activebackground="#3a1816",
         activeforeground="#ffffff",
         relief="flat",
+        highlightbackground="#5a2822",
+        highlightthickness=1,
+        bd=0,
         padx=14,
-        pady=8,
+        pady=9,
         font=("Consolas", 11),
+        cursor="hand2",
     )
     exit_button.grid(row=0, column=2)
 
