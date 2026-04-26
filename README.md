@@ -32,6 +32,54 @@ python safe_ransomware_sim.py encrypt
 python safe_ransomware_sim.py decrypt
 ```
 
+## Sandbox Setup And Test Plan
+
+1. Create the sandbox directory:
+
+```powershell
+New-Item -ItemType Directory -Force -Path "C:\RansomLab\sandbox"
+```
+
+2. Add sample files for testing:
+
+```powershell
+"hello world" | Set-Content "C:\RansomLab\sandbox\sample1.txt"
+"demo data" | Set-Content "C:\RansomLab\sandbox\sample2.log"
+```
+
+3. Run encryption:
+
+```powershell
+python safe_ransomware_sim.py encrypt
+```
+
+4. Verify expected encryption results:
+
+```powershell
+Get-ChildItem "C:\RansomLab\sandbox" -Recurse
+```
+
+You should see:
+- `sample1.txt.locked`
+- `sample2.log.locked`
+- `README.txt`
+
+5. Run decryption:
+
+```powershell
+python safe_ransomware_sim.py decrypt
+```
+
+6. Verify restore results:
+
+```powershell
+Get-ChildItem "C:\RansomLab\sandbox" -Recurse
+```
+
+You should see files restored to original names:
+- `sample1.txt`
+- `sample2.log`
+
 ## Important
 
 - Educational use only
