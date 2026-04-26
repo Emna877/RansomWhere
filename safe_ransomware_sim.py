@@ -95,7 +95,7 @@ def create_ransom_note() -> None:
         log(f"Failed to create ransom note {note_path}: {exc}")
 
 
-def process_directory(mode: str) -> None:
+def process_directory(mode: str) -> dict[str, int]:
     """
     Traverse sandbox files and process based on mode.
 
@@ -107,17 +107,34 @@ def process_directory(mode: str) -> None:
     - Process only *.locked files
     - Decrypt them, then rename back by removing .locked
     """
+    # Counters make it obvious why the run appears to do "nothing".
+    stats = {
+        "found_files": 0,
+        "encrypted": 0,
+        "decrypted": 0,
+        "renamed_locked": 0,
+        "renamed_restored": 0,
+        "skipped_already_locked": 0,
+        "skipped_non_locked": 0,
+        "skipped_note": 0,
+        "errors": 0,
+    }
+
     if not SANDBOX_DIR.exists():
         log(f"Sandbox directory does not exist: {SANDBOX_DIR}")
-        return
+        log("Troubleshoot: create the sandbox folder and place test files in it.")
+        return stats
 
     if not SANDBOX_DIR.is_dir():
         log(f"Sandbox path is not a directory: {SANDBOX_DIR}")
-        return
+        return stats
 
     if not is_within_sandbox(SANDBOX_DIR):
         log(f"Unsafe sandbox path detected; aborting: {SANDBOX_DIR}")
-        return
+        return stats
+
+    log(f"Mode: {mode}")
+    log(f"Sandbox root: {SANDBOX_DIR.resolve(strict=False)}")
 
     for root, _, files in os.walk(SANDBOX_DIR, topdown=True, followlinks=False):
         root_path = Path(root)
@@ -128,6 +145,7 @@ def process_directory(mode: str) -> None:
 
         for filename in files:
             file_path = root_path / filename
+            stats["found_files"] += 1
 
             if not is_within_sandbox(file_path):
                 log(f"Skipping unsafe file outside sandbox: {file_path}")
@@ -135,11 +153,13 @@ def process_directory(mode: str) -> None:
 
             if filename == RANSOM_NOTE_NAME:
                 log(f"Skipping ransom note file: {file_path}")
+                stats["skipped_note"] += 1
                 continue
 
             if mode == "encrypt":
                 if file_path.name.endswith(LOCKED_EXTENSION):
                     log(f"Skipping already encrypted file: {file_path}")
+                    stats["skipped_already_locked"] += 1
                     continue
 
                 encrypt_file(file_path)
@@ -152,12 +172,16 @@ def process_directory(mode: str) -> None:
                 try:
                     file_path.rename(locked_path)
                     log(f"Renamed to locked: {locked_path}")
+                    stats["encrypted"] += 1
+                    stats["renamed_locked"] += 1
                 except Exception as exc:
                     log(f"Failed to rename {file_path} -> {locked_path}: {exc}")
+                    stats["errors"] += 1
 
             elif mode == "decrypt":
                 if not file_path.name.endswith(LOCKED_EXTENSION):
                     log(f"Skipping non-locked file: {file_path}")
+                    stats["skipped_non_locked"] += 1
                     continue
 
                 decrypt_file(file_path)
@@ -175,8 +199,39 @@ def process_directory(mode: str) -> None:
                 try:
                     file_path.rename(restored_path)
                     log(f"Restored filename: {restored_path}")
+                    stats["decrypted"] += 1
+                    stats["renamed_restored"] += 1
                 except Exception as exc:
                     log(f"Failed to rename {file_path} -> {restored_path}: {exc}")
+                    stats["errors"] += 1
+
+    # End-of-run diagnostics help explain common no-op cases.
+    if stats["found_files"] == 0:
+        log("Troubleshoot: no files were found in the sandbox.")
+
+    if mode == "encrypt" and stats["encrypted"] == 0 and stats["found_files"] > 0:
+        log("Troubleshoot: nothing encrypted. Files may already end with .locked, or only README.txt is present.")
+
+    if mode == "decrypt" and stats["decrypted"] == 0 and stats["found_files"] > 0:
+        log("Troubleshoot: nothing decrypted. No files ending with .locked were found.")
+
+    return stats
+
+
+def log_summary(mode: str, stats: dict[str, int]) -> None:
+    """Print a compact summary so test outcomes are easy to verify."""
+    log("----- Summary -----")
+    log(f"Found files: {stats['found_files']}")
+    if mode == "encrypt":
+        log(f"Encrypted files: {stats['encrypted']}")
+        log(f"Renamed to .locked: {stats['renamed_locked']}")
+        log(f"Skipped already .locked: {stats['skipped_already_locked']}")
+    elif mode == "decrypt":
+        log(f"Decrypted files: {stats['decrypted']}")
+        log(f"Renamed back to original: {stats['renamed_restored']}")
+        log(f"Skipped non-.locked files: {stats['skipped_non_locked']}")
+    log(f"Skipped ransom note: {stats['skipped_note']}")
+    log(f"Errors: {stats['errors']}")
 
 
 def main() -> None:
@@ -193,12 +248,14 @@ def main() -> None:
 
     if args.mode == "encrypt":
         log("Starting encryption simulation...")
-        process_directory("encrypt")
+        stats = process_directory("encrypt")
         create_ransom_note()
+        log_summary("encrypt", stats)
         log("Encryption simulation complete.")
     elif args.mode == "decrypt":
         log("Starting decryption simulation...")
-        process_directory("decrypt")
+        stats = process_directory("decrypt")
+        log_summary("decrypt", stats)
         log("Decryption simulation complete.")
 
 
