@@ -15,3 +15,4 @@ env/
 *.locked
 sandbox/
 RansomLab/
+private_key.pem
