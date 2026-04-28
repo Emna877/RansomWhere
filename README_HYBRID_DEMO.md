@@ -1,10 +1,10 @@
 # Hybrid Encryption Demo (Sandbox-Only)
 
-This document describes the safe hybrid encryption demo implemented in `safe_ransomware_sim2.py`.
+This document describes the safe hybrid encryption demo implemented in `script.py`.
 
 ## Overview
 
-The script demonstrates envelope encryption on **one file at a time**:
+The script demonstrates envelope encryption on files inside the sandbox:
 
 - AES-256-GCM encrypts file contents
 - RSA-2048 (OAEP-SHA256) encrypts the AES session key
@@ -22,7 +22,6 @@ Safety behavior:
 - Refuses any file path outside sandbox
 - Requires explicit consent (unless `--yes` is used)
 - No directory traversal
-- No system-level operations
 - No persistence behavior
 
 ## Requirements
@@ -33,27 +32,23 @@ Install dependencies:
 C:/Python313/python.exe -m pip install -r requirements.txt
 ```
 
-`requirements.txt` includes:
-
-- `cryptography>=42.0.0`
-
 ## Commands
 
 ### 1. Generate RSA key pair
 
 ```powershell
-C:/Python313/python.exe safe_ransomware_sim2.py gen-keys
+C:/Python313/python.exe script.py gen-keys
 ```
 
 Creates:
 
 - `C:\RansomLab\sandbox\keys\public_key.pem`
-- `C:\RansomLab\sandbox\keys\private_key.pem`
+- `D:\RansomWhere\private_key.pem`
 
 ### 2. Encrypt one file
 
 ```powershell
-C:/Python313/python.exe safe_ransomware_sim2.py encrypt --file C:/RansomLab/sandbox/sample.txt
+C:/Python313/python.exe script.py encrypt 
 ```
 
 Output file:
@@ -63,12 +58,14 @@ Output file:
 ### 3. Decrypt one file
 
 ```powershell
-C:/Python313/python.exe safe_ransomware_sim2.py decrypt --file C:/RansomLab/sandbox/sample.txt.hyenc
+C:/Python313/python.exe script.py decrypt 
 ```
 
 Output file:
 
-- `sample.txt.restored`
+- `sample.txt`
+
+If you want to target a specific file, pass its path through the sandbox workflow described by the script.
 
 ## Optional Flags
 
@@ -82,6 +79,8 @@ Use custom key paths (must still be inside sandbox):
 
 - Encrypt: `--public-key <path>`
 - Decrypt: `--private-key <path>`
+
+You can also use `--yes` together with either command to skip the confirmation prompt during lab runs.
 
 ## Encrypted File Structure
 
