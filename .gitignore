@@ -6,7 +6,8 @@ __pycache__/
 .venv/
 venv/
 env/
-
+lib/
+scripts/
 # Test/tool cache
 .pytest_cache/
 .mypy_cache/
