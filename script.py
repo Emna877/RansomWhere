@@ -30,7 +30,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # Configuration
-SANDBOX_PATH = Path(r"C:\RansomLab\sandbox")
+SANDBOX_PATH = Path(r"C:\Users\zeine\Desktop\RansomWhere")
 KEYS_DIR = SANDBOX_PATH / "keys"
 PUBLIC_KEY_PATH = KEYS_DIR / "public_key.pem"
 # Store the private key outside the sandbox so only the public key remains there.
