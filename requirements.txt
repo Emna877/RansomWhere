@@ -1,2 +1,7 @@
 cryptography>=42.0.0
 pyfiglet>=0.8.1
+watchdog
+scikit-learn
+numpy
+rich
+
