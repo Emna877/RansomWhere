@@ -9,20 +9,40 @@ anomalies that indicate a ransomware attack.
 
 import time
 import threading
+import argparse
 import numpy as np
 from collections import deque
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from rich.layout import Layout
 import warnings
-import tkinter as tk
-from tkinter import font
+try:
+    import tkinter as tk
+    from tkinter import font
+except Exception:
+    tk = None
+    font = None
 
 # Suppress scikit-learn warnings
 warnings.filterwarnings("ignore")
 from sklearn.ensemble import IsolationForest
 
 SANDBOX_PATH = Path(r"C:\RansomLab\sandbox")
+
+
+def get_file_stats():
+    """Collect basic sandbox file statistics for UI and CLI rendering."""
+    try:
+        all_files = [f for f in SANDBOX_PATH.glob("*") if f.is_file()]
+        encrypted_files = list(SANDBOX_PATH.glob("*.hyenc"))
+        encrypted_names = sorted([f.name for f in encrypted_files])
+        total_files_count = len(all_files)
+        encrypted_count = len(encrypted_files)
+        safe_files_count = total_files_count - encrypted_count
+        return total_files_count, encrypted_count, safe_files_count, encrypted_names
+    except Exception:
+        return 0, 0, 0, []
 
 class RansomwareDetector(FileSystemEventHandler):
     def __init__(self):
@@ -112,8 +132,18 @@ def run_detector():
     observer.schedule(detector_handler, str(SANDBOX_PATH), recursive=True)
     observer.start()
 
+    if tk is None:
+        print("[WARN] Tkinter is unavailable. Falling back to CLI mode.")
+        run_detector_cli(detector_handler, observer)
+        return
+
     # Create GUI Window
-    root = tk.Tk()
+    try:
+        root = tk.Tk()
+    except Exception as exc:
+        print(f"[WARN] GUI failed to start ({exc}). Falling back to CLI mode.")
+        run_detector_cli(detector_handler, observer)
+        return
     root.title("🚨 AI RANSOMWARE DETECTOR (Cyber EDR) 🚨")
     root.geometry("900x600")
     root.configure(bg="#0d1117")
@@ -218,23 +248,7 @@ def run_detector():
                 prediction = detector_handler.model.predict(features)[0]
                 score = detector_handler.model.decision_function(features)[0]
             
-            # Count files in sandbox
-            try:
-                all_files = list(SANDBOX_PATH.glob("*"))
-                total_files_count = len(all_files)
-                
-                encrypted_files = list(SANDBOX_PATH.glob("*.hyenc"))
-                encrypted_count = len(encrypted_files)
-                
-                safe_files_count = total_files_count - encrypted_count
-                
-                # Get encrypted file names
-                encrypted_names = sorted([f.name for f in encrypted_files])
-            except:
-                total_files_count = 0
-                encrypted_count = 0
-                safe_files_count = 0
-                encrypted_names = []
+            total_files_count, encrypted_count, safe_files_count, encrypted_names = get_file_stats()
             
             # Update metrics
             metric1_value.config(text=f"{total_files_count} files")
@@ -309,5 +323,55 @@ def run_detector():
         observer.stop()
         observer.join()
 
+
+def run_detector_cli(detector_handler, observer):
+    """Run terminal-based monitoring when GUI is unavailable."""
+    print("AI RANSOMWARE DETECTOR - CLI MODE")
+    print(f"Monitoring: {SANDBOX_PATH}")
+    print("Press Ctrl+C to stop.")
+
+    try:
+        while True:
+            event_rate, hyenc_ratio = detector_handler.extract_features(window_seconds=5)
+            if event_rate > 0:
+                features = np.array([[event_rate, hyenc_ratio]])
+                score = detector_handler.model.decision_function(features)[0]
+            else:
+                score = 0.5
+
+            total_files_count, encrypted_count, safe_files_count, encrypted_names = get_file_stats()
+            if encrypted_count > 0:
+                state = "RANSOMWARE DETECTED"
+            else:
+                state = "SYSTEM SECURE"
+
+            print("-" * 70)
+            print(
+                f"State: {state} | Total: {total_files_count} | "
+                f"Encrypted: {encrypted_count} | Safe: {safe_files_count}"
+            )
+            print(f"EventRate: {event_rate:.2f}/s | HyencRatio: {hyenc_ratio:.2f} | Score: {score:.3f}")
+            if encrypted_names:
+                print("Encrypted files:", ", ".join(encrypted_names[:8]))
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        observer.stop()
+        observer.join()
+
 if __name__ == "__main__":
-    run_detector()
+    parser = argparse.ArgumentParser(description="AI ransomware detector")
+    parser.add_argument("--cli", action="store_true", help="force terminal mode")
+    args = parser.parse_args()
+
+    if args.cli:
+        if not SANDBOX_PATH.exists():
+            SANDBOX_PATH.mkdir(parents=True, exist_ok=True)
+        handler = RansomwareDetector()
+        obs = Observer()
+        obs.schedule(handler, str(SANDBOX_PATH), recursive=True)
+        obs.start()
+        run_detector_cli(handler, obs)
+    else:
+        run_detector()
